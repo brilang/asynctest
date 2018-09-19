@@ -2,7 +2,8 @@ import React, { Component } from 'react';
 import './App.css';
 import axios from 'axios'
 import * as Promise from 'bluebird'
-import { Button, Card, CardText, CardTitle, Col, Container, Navbar, NavbarBrand, Row } from 'reactstrap';
+import { Card, CardBody, CardTitle, CardSubtitle, Col, Container, Navbar, NavbarBrand, Row } from 'reactstrap';
+import uuidv4 from 'uuid'
 
 class App extends Component {
   constructor(props) {
@@ -13,37 +14,25 @@ class App extends Component {
     };
   }
 
-  getCharacters() {
-    let characters = [];
-    Promise.map(this.state.book.characters, function(charcterurl) {
-      axios.get(charcterurl)
-      .then(res => {
-        characters.push(res.data);
-        return res.data
-      })
-    }, {concurrency: 5})
-    .then(function() {
-      console.log(characters)
-      this.setState({characters: characters})
-    })
-  }
-
-  // displayCharacters() {
-  //   return (
-  //     <Card body>
-  //       <CardTitle>{this.state.character.name}</CardTitle>
-  //       <CardText>With supporting text below as a natural lead-in to additional content.</CardText>
-  //       <Button>Go somewhere</Button>
-  //     </Card>
-  //   )
-  // }
-
   async componentDidMount() {
-    axios.get('https://www.anapioficeandfire.com/api/books/1')
-    .then(res => {
-      const book = res.data;
-      this.setState({ book }, this.getCharacters);
-    })
+    try {
+      const results = await axios.get('https://www.anapioficeandfire.com/api/books/1')
+      const book = results.data
+      this.setState({book: results.data})
+      Promise.map(book.characters, function(character) {
+        const results = axios.get(character)
+        .then((result) => {
+          return result.data
+        })
+        return results
+      }, {concurrency: 20})
+      .then((newresult) => {
+        this.setState({characters: newresult})
+      })
+    }
+    catch (error) {
+      console.log(error)
+    }
   }
 
   render() {
@@ -54,9 +43,25 @@ class App extends Component {
         </Navbar>
         <Container style={{marginTop: "15px"}}>
           <Row>
-            <Col xs="3">
-            { this.state.characters.length ? 'Characters' : 'No Characters Loaded' }
-            </Col>
+            { this.state.characters.length
+              ? (
+                this.state.characters.map((character) => {
+                  return  (
+                    <Col xs="4" key={character.url} style={{marginBottom: "15px"}}>
+                      <Card>
+                        <CardBody>
+                          <CardTitle>{character.name}</CardTitle>
+                          <CardSubtitle>{character.titles.map(title => <React.Fragment key={uuidv4()}>{title}<br/></React.Fragment>)}</CardSubtitle>
+                        </CardBody>
+                      </Card>
+                    </Col>
+                  )
+                }
+              )
+            ) : (
+              'Loading...'
+            )
+          }
           </Row>
         </Container>
       </div>
